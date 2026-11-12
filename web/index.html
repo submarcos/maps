@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Makina Maps - Visualiseur de Tuiles Vectorielles</title>
+    <!-- MapLibre GL JS -->
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; height: 100vh; overflow: hidden; color: #2d3748; }
+        
+        #sidebar {
+            width: 380px;
+            background: #ffffff;
+            border-right: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+        }
+
+        .header {
+            padding: 16px 20px;
+            background: #1a202c;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header h1 {
+            font-size: 1.15rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .badge {
+            font-size: 0.7rem;
+            background: #3182ce;
+            padding: 2px 8px;
+            border-radius: 999px;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        .sidebar-content {
+            padding: 16px 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .section {
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #718096;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .style-selector {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .radio-card {
+            display: flex;
+            align-items: center;
+            padding: 9px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .radio-card:hover {
+            border-color: #3182ce;
+            background: #ebf8ff;
+        }
+
+        .radio-card input {
+            margin-right: 10px;
+        }
+
+        .raster-box {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .switch-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.8rem;
+            color: #4a5568;
+        }
+
+        .slider-row input[type="range"] {
+            flex: 1;
+        }
+
+        .quick-nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .nav-chip {
+            background: #edf2f7;
+            border: 1px solid #cbd5e0;
+            color: #2d3748;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .nav-chip:hover {
+            background: #e2e8f0;
+            border-color: #a0aec0;
+        }
+
+        .inspector-box {
+            background: #f7fafc;
+            border: 1px solid #edf2f7;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 0.82rem;
+        }
+
+        .inspector-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .inspector-row:last-child { margin-bottom: 0; }
+        .inspector-label { color: #718096; }
+        .inspector-val { font-family: monospace; font-weight: 600; color: #2b6cb0; }
+
+        .code-box {
+            background: #1a202c;
+            color: #e2e8f0;
+            border-radius: 8px;
+            padding: 9px 12px;
+            font-family: monospace;
+            font-size: 0.72rem;
+            overflow-x: auto;
+            margin-top: 6px;
+            word-break: break-all;
+        }
+
+        .copy-btn {
+            background: #4a5568;
+            color: #fff;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.72rem;
+            cursor: pointer;
+            margin-top: 6px;
+        }
+        .copy-btn:hover { background: #2b6cb0; }
+
+        #map {
+            flex: 1;
+            height: 100%;
+            position: relative;
+        }
+
+        .tile-hud {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(26, 32, 44, 0.88);
+            color: #ffffff;
+            padding: 9px 14px;
+            border-radius: 8px;
+            backdrop-filter: blur(4px);
+            font-family: monospace;
+            font-size: 0.78rem;
+            z-index: 5;
+            pointer-events: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.12);
+        }
+
+        .tile-hud span { color: #63b3ed; font-weight: bold; }
+
+        /* Basemap indicator on map */
+        .basemap-badge {
+            position: absolute;
+            bottom: 25px;
+            left: 15px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            color: #4a5568;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .basemap-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #38a169;
+        }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <div class="header">
+            <div class="header-title">
+                <div>
+                    <h1>Makina Maps</h1>
+                    <div style="font-size:0.72rem; color:#a0aec0;">Serveur de Tuiles Vectorielles OSM</div>
+                </div>
+            </div>
+            <span class="badge">v2.0</span>
+        </div>
+        <div class="sidebar-content">
+
+            <!-- Section 1 : Fond de Plan Raster OSM pour se positionner -->
+            <div class="section">
+                <div class="section-title">
+                    <span>Fond Raster OSM (Repérage)</span>
+                    <span style="font-size:0.68rem; color:#3182ce; font-weight:normal;">Mondial</span>
+                </div>
+                <div class="raster-box">
+                    <label class="switch-row" style="cursor:pointer;">
+                        <span>Activer le fond raster OSM</span>
+                        <input type="checkbox" id="toggle-osm-raster" checked style="width:16px; height:16px; cursor:pointer;">
+                    </label>
+                    <div class="slider-row">
+                        <span>Opacité :</span>
+                        <input type="range" id="slider-osm-raster" min="0" max="100" value="45">
+                        <span id="raster-opacity-val" style="width:35px; text-align:right; font-weight:bold;">45%</span>
+                    </div>
+                    <div style="font-size:0.72rem; color:#718096; line-height:1.3;">
+                        Permet de se positionner instantanément même si votre extrait local ne couvre qu'une ville ou région.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 2 : Styles Vectoriels Locaux -->
+            <div class="section">
+                <div class="section-title">Styles Vectoriels Locaux</div>
+                <div class="style-selector">
+                    <label class="radio-card">
+                        <input type="radio" name="map-style" value="bright" checked>
+                        <div>
+                            <strong>OSM Bright (Local)</strong>
+                            <div style="font-size:0.72rem; color:#718096;">Style clair et contrasté</div>
+                        </div>
+                    </label>
+                    <label class="radio-card">
+                        <input type="radio" name="map-style" value="liberty">
+                        <div>
+                            <strong>OSM Liberty (Local)</strong>
+                            <div style="font-size:0.72rem; color:#718096;">Palette moderne Mapbox Streets</div>
+                        </div>
+                    </label>
+                    <label class="radio-card">
+                        <input type="radio" name="map-style" value="basic">
+                        <div>
+                            <strong>Minimal Basic (Local)</strong>
+                            <div style="font-size:0.72rem; color:#718096;">Idéal pour superpositions</div>
+                        </div>
+                    </label>
+                    <label class="radio-card">
+                        <input type="radio" name="map-style" value="osm-standard">
+                        <div>
+                            <strong>OSM Standard Raster Pur</strong>
+                            <div style="font-size:0.72rem; color:#718096;">Rendu OpenStreetMap.org officiel</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Section 3 : Centrage Rapide -->
+            <div class="section">
+                <div class="section-title">Centrage Rapide</div>
+                <div class="quick-nav">
+                    <button class="nav-chip" onclick="flyToLoc(7.42, 43.73, 14)">Monaco</button>
+                    <button class="nav-chip" onclick="flyToLoc(1.52, 42.50, 13)">Andorre</button>
+                    <button class="nav-chip" onclick="flyToLoc(2.35, 48.85, 12)">Paris</button>
+                    <button class="nav-chip" onclick="flyToLoc(4.83, 45.76, 12)">Lyon</button>
+                    <button class="nav-chip" onclick="flyToLoc(6.13, 49.61, 13)">Luxembourg</button>
+                    <button class="nav-chip" onclick="flyToLoc(2.21, 46.22, 5)">France</button>
+                    <button class="nav-chip" onclick="locateUser()">📍 Ma Position</button>
+                </div>
+            </div>
+
+            <!-- Section 4 : Inspecteur de Coordonnées -->
+            <div class="section">
+                <div class="section-title">Inspecteur de Coordonnées</div>
+                <div class="inspector-box">
+                    <div class="inspector-row">
+                        <span class="inspector-label">Zoom :</span>
+                        <span class="inspector-val" id="val-zoom">--</span>
+                    </div>
+                    <div class="inspector-row">
+                        <span class="inspector-label">Tuile (Z/X/Y) :</span>
+                        <span class="inspector-val" id="val-tile">--</span>
+                    </div>
+                    <div class="inspector-row">
+                        <span class="inspector-label">Position :</span>
+                        <span class="inspector-val" id="val-pos">--</span>
+                    </div>
+                    <div class="inspector-row">
+                        <span class="inspector-label">Cache Nginx :</span>
+                        <span class="inspector-val" style="color:#38a169;">ACTIF (proxy_cache)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 5 : Points d'accès API -->
+            <div class="section">
+                <div class="section-title">Points d'accès API</div>
+                <div style="font-size:0.75rem; color:#4a5568; margin-bottom:2px;">Tuile Vectorielle (MVT) :</div>
+                <div class="code-box" id="tile-url-preview">/data/v3/{z}/{x}/{y}.pbf</div>
+                <div style="font-size:0.75rem; color:#4a5568; margin-top:6px; margin-bottom:2px;">TileJSON :</div>
+                <div class="code-box">http://localhost:8080/data/v3.json</div>
+                <button class="copy-btn" onclick="copyTileJson()">Copier l'URL TileJSON</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="map">
+        <div class="tile-hud">
+            Tuile: <span id="hud-tile">Z/X/Y</span> | Zoom: <span id="hud-zoom">0</span>
+        </div>
+        <div class="basemap-badge">
+            <span class="basemap-dot"></span>
+            <span>Fond Raster OSM : <strong id="hud-raster-status">Sous-jacent (45%)</strong></span>
+        </div>
+    </div>
+
+    <script>
+        const host = window.location.origin;
+
+        // Styles dictionary
+        const styles = {
+            bright: `${host}/styles/bright/style.json`,
+            liberty: `${host}/styles/liberty/style.json`,
+            basic: `${host}/styles/basic/style.json`,
+            'osm-standard': {
+                version: 8,
+                name: 'OpenStreetMap Standard',
+                sources: {
+                    'osm-raster': {
+                        type: 'raster',
+                        tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                        tileSize: 256,
+                        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    }
+                },
+                layers: [
+                    {
+                        id: 'osm-raster-base',
+                        type: 'raster',
+                        source: 'osm-raster',
+                        minzoom: 0,
+                        maxzoom: 19
+                    }
+                ]
+            }
+        };
+
+        let currentStyleKey = 'bright';
+        let rasterBasemapEnabled = true;
+        let rasterOpacity = 0.45;
+
+        // Initialize MapLibre
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: styles.bright,
+            center: [7.42, 43.73], // Default: Monaco
+            zoom: 13,
+            hash: true
+        });
+
+        map.addControl(new maplibregl.NavigationControl(), 'top-left');
+        map.addControl(new maplibregl.ScaleControl(), 'bottom-right');
+
+        // Function to ensure the OSM raster basemap is present in current style
+        function updateRasterBasemap() {
+            if (currentStyleKey === 'osm-standard') {
+                document.getElementById('hud-raster-status').textContent = 'Plein écran';
+                return;
+            }
+
+            const sourceId = 'osm-global-raster';
+            const layerId = 'osm-global-raster-layer';
+
+            if (!map.getSource(sourceId)) {
+                map.addSource(sourceId, {
+                    type: 'raster',
+                    tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                    tileSize: 256,
+                    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                });
+            }
+
+            if (!map.getLayer(layerId)) {
+                // Find the first non-background layer to place the raster underneath vector features
+                const layers = map.getStyle().layers || [];
+                let beforeLayerId = undefined;
+                for (const l of layers) {
+                    if (l.type !== 'background') {
+                        beforeLayerId = l.id;
+                        break;
+                    }
+                }
+
+                map.addLayer({
+                    id: layerId,
+                    type: 'raster',
+                    source: sourceId,
+                    paint: {
+                        'raster-opacity': rasterBasemapEnabled ? rasterOpacity : 0
+                    }
+                }, beforeLayerId);
+            } else {
+                map.setPaintProperty(layerId, 'raster-opacity', rasterBasemapEnabled ? rasterOpacity : 0);
+            }
+
+            document.getElementById('hud-raster-status').textContent = rasterBasemapEnabled 
+                ? `Actif (${Math.round(rasterOpacity * 100)}%)` 
+                : 'Désactivé';
+        }
+
+        map.on('style.load', () => {
+            updateRasterBasemap();
+        });
+
+        // Style switcher
+        document.querySelectorAll('input[name="map-style"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const selected = e.target.value;
+                currentStyleKey = selected;
+                map.setStyle(styles[selected]);
+            });
+        });
+
+        // Toggle raster checkbox
+        const toggleRasterCheckbox = document.getElementById('toggle-osm-raster');
+        toggleRasterCheckbox.addEventListener('change', (e) => {
+            rasterBasemapEnabled = e.target.checked;
+            updateRasterBasemap();
+        });
+
+        // Slider opacity
+        const sliderRaster = document.getElementById('slider-osm-raster');
+        const sliderValLabel = document.getElementById('raster-opacity-val');
+        sliderRaster.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value, 10);
+            rasterOpacity = val / 100;
+            sliderValLabel.textContent = `${val}%`;
+            updateRasterBasemap();
+        });
+
+        // Quick navigation
+        window.flyToLoc = function(lon, lat, zoom) {
+            map.flyTo({
+                center: [lon, lat],
+                zoom: zoom,
+                essential: true
+            });
+        };
+
+        window.locateUser = function() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    map.flyTo({
+                        center: [pos.coords.longitude, pos.coords.latitude],
+                        zoom: 14,
+                        essential: true
+                    });
+                }, () => {
+                    alert('Impossible d’accéder à votre géolocalisation.');
+                });
+            } else {
+                alert('La géolocalisation n’est pas supportée par votre navigateur.');
+            }
+        };
+
+        // Inspector utils
+        function lonLatToTile(lon, lat, zoom) {
+            const z = Math.floor(zoom);
+            const x = Math.floor((lon + 180) / 360 * Math.pow(2, z));
+            const y = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, z));
+            return { z, x, y };
+        }
+
+        map.on('mousemove', (e) => {
+            const z = map.getZoom();
+            const tile = lonLatToTile(e.lngLat.lng, e.lngLat.lat, z);
+            const tileStr = `${tile.z}/${tile.x}/${tile.y}`;
+
+            document.getElementById('val-zoom').textContent = z.toFixed(2);
+            document.getElementById('val-tile').textContent = tileStr;
+            document.getElementById('val-pos').textContent = `${e.lngLat.lat.toFixed(4)}, ${e.lngLat.lng.toFixed(4)}`;
+
+            document.getElementById('hud-zoom').textContent = z.toFixed(1);
+            document.getElementById('hud-tile').textContent = tileStr;
+            document.getElementById('tile-url-preview').textContent = `${host}/data/v3/${tileStr}.pbf`;
+        });
+
+        window.copyTileJson = function() {
+            navigator.clipboard.writeText(`${host}/data/v3.json`).then(() => {
+                alert('URL TileJSON copiée dans le presse-papier !');
+            });
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,221 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ==============================================================================
+# MAKINA MAPS CLI - Master Management Tool
+# Modernized & Simplified OpenStreetMap Vector Tile Platform
+# ==============================================================================
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "${ROOT_DIR}"
+
+if [[ -f .env ]]; then
+    # shellcheck disable=SC1091
+    source .env
+fi
+
+PORT="${PORT:-8080}"
+POSTGRES_DB="${POSTGRES_DB:-openmaptiles}"
+POSTGRES_USER="${POSTGRES_USER:-openmaptiles}"
+
+# Colors
+C_RESET="\033[0m"
+C_BOLD="\033[1m"
+C_BLUE="\033[1;34m"
+C_GREEN="\033[1;32m"
+C_YELLOW="\033[1;33m"
+C_RED="\033[1;31m"
+C_CYAN="\033[1;36m"
+
+function banner() {
+    echo -e "${C_BLUE}======================================================================${C_RESET}"
+    echo -e "${C_BOLD}   __  ___      __    _                __  ___                 ${C_RESET}"
+    echo -e "${C_BOLD}  /  |/  /___ _/ /__ (_)__  ___ _     /  |/  /___ _____  _____ ${C_RESET}"
+    echo -e "${C_BOLD} / /|_/ / _ \`/  '_// / _ \\/ _ \`/    / /|_/ / _ \`/ _ \\(_-< ${C_RESET}"
+    echo -e "${C_BOLD}/_/  /_/\\_,_/_/\\_\\/_/_//_/\\_,_/    /_/  /_/\\_,_/ .__/___/ ${C_RESET}"
+    echo -e "${C_BOLD}                                              /_/              ${C_RESET}"
+    echo -e "${C_CYAN}  Plateforme Moderne de Génération de Tuiles Vectorielles OSM v2.0  ${C_RESET}"
+    echo -e "${C_BLUE}======================================================================${C_RESET}"
+}
+
+function usage() {
+    banner
+    echo -e "Utilisation : ${C_BOLD}./makina <commande> [arguments]${C_RESET}\n"
+    echo -e "${C_BOLD}Commandes principales :${C_RESET}"
+    echo -e "  ${C_GREEN}init${C_RESET}                 Initialiser l'environnement et vérifier les dépendances"
+    echo -e "  ${C_GREEN}download [zone|url]${C_RESET}  Télécharger un extrait OSM (ex: monaco, andorra, france...)"
+    echo -e "  ${C_GREEN}import [fichier.pbf]${C_RESET} Importer les données OSM dans PostGIS et générer le schéma"
+    echo -e "  ${C_GREEN}start | up${C_RESET}           Démarrer la stack complète (Postgres, Postserve, TileServer, Nginx)"
+    echo -e "  ${C_GREEN}stop | down${C_RESET}          Arrêter les conteneurs"
+    echo -e "  ${C_GREEN}restart${C_RESET}              Redémarrer tous les services"
+    echo -e "  ${C_GREEN}status | ps${C_RESET}          Afficher l'état des conteneurs et les métriques de santé"
+    echo -e "  ${C_GREEN}logs [service]${C_RESET}       Suivre les logs en direct (optionnel: postgres, postserve, tileserver-gl, nginx)"
+    echo -e "  ${C_GREEN}test${C_RESET}                 Tester l'ensemble des points d'accès (HTTP 200, tuiles, styles)"
+    echo -e ""
+    echo -e "${C_BOLD}Commandes avancées :${C_RESET}"
+    echo -e "  ${C_YELLOW}update${C_RESET}               Appliquer les mises à jour incrémentales (diffs OSM) et purger le cache"
+    echo -e "  ${C_YELLOW}purge-cache${C_RESET}          Vider le cache Nginx des tuiles"
+    echo -e "  ${C_YELLOW}export-mbtiles${C_RESET}       Générer une archive MBTiles autonome"
+    echo -e "  ${C_RED}reset${C_RESET}                Supprimer les volumes de données et réinitialiser la base"
+    echo -e ""
+    echo -e "Visualiseur Web disponible à : ${C_CYAN}http://localhost:${PORT}${C_RESET}\n"
+}
+
+function check_deps() {
+    echo -e "${C_BLUE}[*] Vérification des prérequis système...${C_RESET}"
+    local missing=0
+    for cmd in docker curl; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            echo -e "${C_RED}[!] Erreur: '${cmd}' n'est pas installé.${C_RESET}"
+            missing=1
+        fi
+    done
+
+    if ! docker compose version >/dev/null 2>&1; then
+        echo -e "${C_RED}[!] Erreur: 'docker compose' n'est pas disponible.${C_RESET}"
+        missing=1
+    fi
+
+    if [[ $missing -eq 0 ]]; then
+        echo -e "${C_GREEN}✔ Tous les prérequis sont satisfaits (Docker, Docker Compose, cURL).${C_RESET}"
+    else
+        exit 1
+    fi
+}
+
+function init_project() {
+    check_deps
+    echo -e "${C_BLUE}[*] Initialisation des dossiers de données et de cache...${C_RESET}"
+    mkdir -p data/expire_tiles data/import data/export build fonts styles web config
+    chmod +x scripts/*.sh || true
+
+    if [[ ! -f .env ]]; then
+        cp .env.example .env
+        echo -e "${C_GREEN}✔ Fichier .env créé à partir de .env.example${C_RESET}"
+    fi
+
+    echo -e "${C_GREEN}✔ Projet initialisé avec succès !${C_RESET}"
+    echo -e "Prochaine étape : ${C_YELLOW}./makina download monaco${C_RESET} puis ${C_YELLOW}./makina import${C_RESET}"
+}
+
+function run_test() {
+    echo -e "${C_BLUE}[*] Exécution des tests d'intégration Makina Maps...${C_RESET}"
+    local BASE_URL="http://localhost:${PORT}"
+    local failed=0
+
+    # 1. Healthcheck
+    echo -n "  - Test endpoint santé (${BASE_URL}/health) : "
+    if curl -s -f "${BASE_URL}/health" | grep -q "ok"; then
+        echo -e "${C_GREEN}OK${C_RESET}"
+    else
+        echo -e "${C_RED}ÉCHEC (La stack est-elle démarrée avec './makina start' ?)${C_RESET}"
+        failed=1
+    fi
+
+    # 2. Visualiseur Web
+    echo -n "  - Test visualiseur Web (${BASE_URL}/) : "
+    if curl -s -f "${BASE_URL}/" | grep -q "Makina Maps"; then
+        echo -e "${C_GREEN}OK${C_RESET}"
+    else
+        echo -e "${C_RED}ÉCHEC${C_RESET}"
+        failed=1
+    fi
+
+    # 3. TileJSON
+    echo -n "  - Test métadonnées TileJSON (${BASE_URL}/data/v3.json) : "
+    if curl -s -f "${BASE_URL}/data/v3.json" >/dev/null 2>&1; then
+        echo -e "${C_GREEN}OK${C_RESET}"
+    else
+        echo -e "${C_YELLOW}ATTENTE (Données non encore importées ou postserve en démarrage)${C_RESET}"
+    fi
+
+    # 4. Styles MapLibre
+    echo -n "  - Test Style Bright (${BASE_URL}/styles/bright/style.json) : "
+    if curl -s -f "${BASE_URL}/styles/bright/style.json" >/dev/null 2>&1; then
+        echo -e "${C_GREEN}OK${C_RESET}"
+    else
+        echo -e "${C_RED}ÉCHEC${C_RESET}"
+        failed=1
+    fi
+
+    # 5. Téléchargement Tuile Vectorielle PBF
+    echo -n "  - Test Tuile PBF (${BASE_URL}/tiles/5/16/11.pbf) : "
+    if curl -s -f "${BASE_URL}/tiles/5/16/11.pbf" >/dev/null 2>&1; then
+        echo -e "${C_GREEN}OK${C_RESET}"
+    else
+        echo -e "${C_RED}ÉCHEC${C_RESET}"
+        failed=1
+    fi
+
+    if [[ $failed -eq 0 ]]; then
+        echo -e "\n${C_GREEN}✔ Tous les services répondent parfaitement !${C_RESET}"
+        echo -e "Ouvrez votre navigateur sur : ${C_CYAN}${BASE_URL}${C_RESET}"
+    fi
+}
+
+# Main Command Dispatcher
+COMMAND="${1:-}"
+shift || true
+
+case "${COMMAND}" in
+    init)
+        init_project
+        ;;
+    download)
+        ./scripts/01_download.sh "${@}"
+        ;;
+    import)
+        ./scripts/02_import.sh "${@}"
+        ;;
+    start|up)
+        banner
+        echo -e "${C_BLUE}[*] Démarrage de tous les services...${C_RESET}"
+        docker compose up -d
+        echo -e "${C_GREEN}✔ Services démarrés !${C_RESET}"
+        echo -e "Visualiseur Web disponible sur : ${C_CYAN}http://localhost:${PORT}${C_RESET}"
+        echo -e "Métriques Nginx disponibles sur  : ${C_CYAN}http://localhost:${NGINX_STATUS_PORT:-8082}/nginx_status${C_RESET}"
+        ;;
+    stop|down)
+        echo -e "${C_BLUE}[*] Arrêt des services...${C_RESET}"
+        docker compose stop
+        echo -e "${C_GREEN}✔ Services arrêtés.${C_RESET}"
+        ;;
+    restart)
+        echo -e "${C_BLUE}[*] Redémarrage des services...${C_RESET}"
+        docker compose restart
+        echo -e "${C_GREEN}✔ Services redémarrés.${C_RESET}"
+        ;;
+    status|ps)
+        banner
+        docker compose ps
+        ;;
+    logs)
+        docker compose logs -f "${@}"
+        ;;
+    update)
+        ./scripts/03_update.sh
+        ;;
+    purge-cache)
+        ./scripts/04_purge_cache.sh "${@}"
+        ;;
+    export-mbtiles)
+        ./scripts/05_export_mbtiles.sh "${@}"
+        ;;
+    test)
+        run_test
+        ;;
+    reset)
+        echo -e "${C_RED}${C_BOLD}[ATTENTION] Cette action va détruire la base PostgreSQL et le cache !${C_RESET}"
+        read -r -p "Êtes-vous sûr de vouloir continuer ? [y/N] " response
+        if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+            docker compose down -v
+            rm -rf build data/expire_tiles/*.tiles
+            echo -e "${C_GREEN}✔ Stack complètement réinitialisée.${C_RESET}"
+        else
+            echo "Opération annulée."
+        fi
+        ;;
+    *)
+        usage
+        ;;
+esac
