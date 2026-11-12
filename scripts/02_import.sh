@@ -51,7 +51,8 @@ docker compose run --rm --entrypoint bash postserve -c "\
     generate-imposm3 /tileset/schema/openmaptiles.yaml > /tileset/build/mapping.yaml"
 
 # 4. Import des données Natural Earth (lacs, océans, frontières mondiales) si nécessaire
-if ! docker compose exec -T postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT 'ne_10m_lakes'::regclass;" >/dev/null 2>&1; then
+HAS_NATURAL_EARTH=$(docker compose exec -T postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -tAc "SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'ne_10m_lakes';" 2>/dev/null || true)
+if [[ "${HAS_NATURAL_EARTH}" != "1" ]]; then
     echo -e "\033[1;34m[*] Initialisation des tables Natural Earth mondiales...\033[0m"
     docker compose run --rm import-data ./import_data.sh natural-earth
     docker compose run --rm import-data ./import_data.sh lake-centerline

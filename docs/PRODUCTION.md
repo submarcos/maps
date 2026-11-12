@@ -23,7 +23,35 @@ INTERNET (HTTPS :443)
 
 ---
 
-## 2. Configuration Systemd (Démarrage Automatique)
+## 2. Réglages Essentiels (.env)
+
+Pour déployer avec votre domaine public (ex: `https://tiles.mon-domaine.fr`), ajustez les variables suivantes dans votre fichier `.env` :
+
+```bash
+# 1. URL publique HTTPS (utilisée par TileJSON data/v3.json pour annoncer les URLs des tuiles)
+OMT_HOST=https://tiles.mon-domaine.fr
+
+# 2. Ports internes
+# Le frontal Nginx Makina Maps est exposé sur 127.0.0.1:8080 pour le reverse proxy
+PORT=8080
+
+# 3. Sécurité de la base de données
+POSTGRES_DB=openmaptiles
+POSTGRES_USER=openmaptiles
+POSTGRES_PASSWORD=un_mot_de_passe_robuste_et_aleatoire
+
+# 4. Dimensionnement du cache Nginx
+# Adapter à l'espace disque NVMe/SSD disponible (ex: 50g à 200g)
+CACHE_MAX_SIZE=50g
+CACHE_KEYS_ZONE_SIZE=100m
+```
+
+> [!IMPORTANT]
+> **Port de debug `8090` :** En production, fermez le port 8090 de l'extérieur. Dans `docker-compose.yml`, retirez le mappage direct `ports: - "8090:8090"` ou remplacez-le par `127.0.0.1:8090:8090`. Seul le port 80 de Nginx doit être ciblé par votre reverse proxy.
+
+---
+
+## 3. Configuration Systemd (Démarrage Automatique)
 
 Pour garantir que la stack redémarre automatiquement après un reboot de la machine hôte :
 
@@ -56,9 +84,11 @@ sudo systemctl start makina-maps
 
 ---
 
-## 3. Configuration HTTPS avec Nginx Hôte
+## 4. Configuration Reverse Proxy HTTPS
 
-Exemple de bloc serveur Nginx avec Let's Encrypt :
+Le conteneur Nginx interne de Makina Maps réécrit dynamiquement les URLs de styles (`style.json`) et du visualiseur web en fonction de l'en-tête `X-Forwarded-Proto` et du domaine public.
+
+### A. Avec Nginx Hôte (Let's Encrypt / Certbot)
 
 ```nginx
 server {
@@ -74,7 +104,7 @@ server {
     ssl_certificate /etc/letsencrypt/live/tiles.mon-domaine.fr/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/tiles.mon-domaine.fr/privkey.pem;
 
-    # Sécurité SSL
+    # Protocoles modernes
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers HIGH:!aNULL:!MD5;
 
@@ -83,18 +113,43 @@ server {
         proxy_set_header Host $http_host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto https;
 
-        # Activer le streaming et la compression
+        # Streaming et timeouts adaptés aux tuiles
         proxy_buffering off;
         proxy_read_timeout 60s;
     }
 }
 ```
 
+### B. Avec Traefik v2/v3 (Labels Docker)
+
+Ajoutez directement sur le service `nginx` de `docker-compose.yml` :
+
+```yaml
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.makinamaps.rule=Host(`tiles.mon-domaine.fr`)"
+      - "traefik.http.routers.makinamaps.entrypoints=websecure"
+      - "traefik.http.routers.makinamaps.tls.certresolver=letsencrypt"
+      - "traefik.http.services.makinamaps.loadbalancer.server.port=80"
+```
+
+### C. Avec Caddy Server
+
+```caddy
+tiles.mon-domaine.fr {
+    reverse_proxy 127.0.0.1:8080 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-Proto https
+    }
+}
+```
+
 ---
 
-## 4. Monitoring et Métriques
+## 5. Monitoring et Métriques
 
 ### A. État de NGINX
 L'état des connexions actives et requêtes/seconde est exposé sur le port interne `8082` :
@@ -117,7 +172,7 @@ Vous pouvez surveiller :
 
 ---
 
-## 5. Sauvegarde & Plan de Reprise d'Activité (PRA)
+## 6. Sauvegarde & Plan de Reprise d'Activité (PRA)
 
 - **Schémas et configurations** : Le répertoire entier de configuration et les styles (`styles/`, `schema/`, `config/`) doivent être versionnés sous Git.
 - **Base de données** : Grâce au script `./makina download` et `./makina import`, vous pouvez réinitialiser et reconstruire l'intégralité d'un nœud en quelques minutes à partir des fichiers PBF sources d'OpenStreetMap.
