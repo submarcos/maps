@@ -471,7 +471,6 @@ tables:
       highway:
       - motorway_junction
 
-# TODO: Future table for joining networks
 # etldoc: imposm3 -> osm_route_member
   route_member:
     type: relation_member

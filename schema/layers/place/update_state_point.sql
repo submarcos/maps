@@ -34,17 +34,11 @@ $$
     )
     UPDATE osm_state_point AS osm
         -- Normalize both scalerank and labelrank into a ranking system from 1 to 6.
-    SET "rank" = LEAST(6, CEILING((scalerank + labelrank + datarank) / 3.0))
+    SET "rank" = GREATEST(1, LEAST(6, CEILING((scalerank + labelrank + datarank) / 3.0)))
     FROM important_state_point AS ne
     WHERE (full_update OR osm.osm_id IN (SELECT osm_id FROM place_state.osm_ids))
       AND rank IS NULL
       AND osm.osm_id = ne.osm_id;
-
-    -- TODO: This shouldn't be necessary? The rank function makes something wrong...
-    UPDATE osm_state_point AS osm
-    SET "rank" = 1
-    WHERE (full_update OR osm_id IN (SELECT osm_id FROM place_state.osm_ids))
-      AND "rank" = 0;
 
     DELETE FROM osm_state_point
     WHERE (full_update OR osm_id IN (SELECT osm_id FROM place_state.osm_ids))

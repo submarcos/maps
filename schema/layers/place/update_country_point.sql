@@ -70,7 +70,7 @@ $$
     UPDATE osm_country_point AS osm
         -- Normalize both scalerank and labelrank into a ranking system from 1 to 6
         -- where the ranks are still distributed uniform enough across all countries
-    SET "rank" = LEAST(6, CEILING((ne.scalerank + ne.labelrank) / 2.0))
+    SET "rank" = GREATEST(1, LEAST(6, CEILING((ne.scalerank + ne.labelrank) / 2.0)))
     FROM important_country_point AS ne
     WHERE (full_update OR osm.osm_id IN (SELECT osm_id FROM place_country.osm_ids))
       AND rank = 7
@@ -81,12 +81,6 @@ $$
     SET "rank" = 6
     WHERE (full_update OR osm_id IN (SELECT osm_id FROM place_country.osm_ids))
       AND "rank" = 7;
-
-    -- TODO: This shouldn't be necessary? The rank function makes something wrong...
-    UPDATE osm_country_point AS osm
-    SET "rank" = 1
-    WHERE (full_update OR osm_id IN (SELECT osm_id FROM place_country.osm_ids))
-      AND "rank" = 0;
 
     UPDATE osm_country_point
     SET tags = update_tags(tags, geometry)

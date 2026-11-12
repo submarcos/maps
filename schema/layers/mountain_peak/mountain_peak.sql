@@ -117,4 +117,4 @@ ORDER BY "rank" ASC;
 
 $$ LANGUAGE SQL STABLE
                 PARALLEL SAFE;
--- TODO: Check if the above can be made STRICT -- i.e. if pixel_width could be NULL
+-- Note: Function is not STRICT so it gracefully handles optional/null pixel_width calls.

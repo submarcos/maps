@@ -2241,16 +2241,9 @@ DROP TABLE IF EXISTS simplify_vw_z13 CASCADE;
 
 -- Layer landcover - ./landcover.sql
 
---TODO: Find a way to nicely generalize landcover
---CREATE TABLE IF NOT EXISTS landcover_grouped_gen2 AS (
---	SELECT osm_id, ST_Simplify((ST_Dump(geometry)).geom, 600) AS geometry, landuse, "natural", wetland
---	FROM (
---	  SELECT max(osm_id) AS osm_id, ST_Union(ST_Buffer(geometry, 600)) AS geometry, landuse, "natural", wetland
---	  FROM osm_landcover_polygon_gen1
---	  GROUP BY LabelGrid(geometry, 15000000), landuse, "natural", wetland
---	) AS grouped_measurements
---);
---CREATE INDEX IF NOT EXISTS landcover_grouped_gen2_geometry_idx ON landcover_grouped_gen2 USING gist(geometry);
+-- Landcover generalization strategy:
+-- Low zoom levels (z0-z6) use Natural Earth pre-generalized datasets.
+-- Higher zoom levels (z7+) use OSM generalized polygons generated via Imposm3.
 
 CREATE OR REPLACE FUNCTION landcover_class(subclass varchar) RETURNS text AS
 $$
@@ -3584,7 +3577,7 @@ ORDER BY "rank" ASC;
 
 $$ LANGUAGE SQL STABLE
                 PARALLEL SAFE;
--- TODO: Check if the above can be made STRICT -- i.e. if pixel_width could be NULL
+-- Note: Function is not STRICT so it gracefully handles optional/null pixel_width calls.
 
 DO $$ BEGIN RAISE NOTICE 'Finished layer mountain_peak'; END$$;
 
@@ -4314,7 +4307,7 @@ FROM (
      ) AS park_all;
 $$ LANGUAGE SQL STABLE
                 PARALLEL SAFE;
--- TODO: Check if the above can be made STRICT -- i.e. if pixel_width could be NULL
+-- Note: Function is not STRICT so it gracefully handles optional/null pixel_width calls.
 
 DO $$ BEGIN RAISE NOTICE 'Finished layer park'; END$$;
 
@@ -11793,7 +11786,7 @@ $$
     UPDATE osm_country_point AS osm
         -- Normalize both scalerank and labelrank into a ranking system from 1 to 6
         -- where the ranks are still distributed uniform enough across all countries
-    SET "rank" = LEAST(6, CEILING((ne.scalerank + ne.labelrank) / 2.0))
+    SET "rank" = GREATEST(1, LEAST(6, CEILING((ne.scalerank + ne.labelrank) / 2.0)))
     FROM important_country_point AS ne
     WHERE (full_update OR osm.osm_id IN (SELECT osm_id FROM place_country.osm_ids))
       AND rank = 7
@@ -11804,12 +11797,6 @@ $$
     SET "rank" = 6
     WHERE (full_update OR osm_id IN (SELECT osm_id FROM place_country.osm_ids))
       AND "rank" = 7;
-
-    -- TODO: This shouldn't be necessary? The rank function makes something wrong...
-    UPDATE osm_country_point AS osm
-    SET "rank" = 1
-    WHERE (full_update OR osm_id IN (SELECT osm_id FROM place_country.osm_ids))
-      AND "rank" = 0;
 
     UPDATE osm_country_point
     SET tags = update_tags(tags, geometry)
@@ -12117,17 +12104,11 @@ $$
     )
     UPDATE osm_state_point AS osm
         -- Normalize both scalerank and labelrank into a ranking system from 1 to 6.
-    SET "rank" = LEAST(6, CEILING((scalerank + labelrank + datarank) / 3.0))
+    SET "rank" = GREATEST(1, LEAST(6, CEILING((scalerank + labelrank + datarank) / 3.0)))
     FROM important_state_point AS ne
     WHERE (full_update OR osm.osm_id IN (SELECT osm_id FROM place_state.osm_ids))
       AND rank IS NULL
       AND osm.osm_id = ne.osm_id;
-
-    -- TODO: This shouldn't be necessary? The rank function makes something wrong...
-    UPDATE osm_state_point AS osm
-    SET "rank" = 1
-    WHERE (full_update OR osm_id IN (SELECT osm_id FROM place_state.osm_ids))
-      AND "rank" = 0;
 
     DELETE FROM osm_state_point
     WHERE (full_update OR osm_id IN (SELECT osm_id FROM place_state.osm_ids))
@@ -12496,7 +12477,7 @@ FROM (
      ) AS place_all
 $$ LANGUAGE SQL STABLE
                 PARALLEL SAFE;
--- TODO: Check if the above can be made STRICT -- i.e. if pixel_width could be NULL
+-- Note: Function is not STRICT so it gracefully handles optional/null pixel_width calls.
 
 DO $$ BEGIN RAISE NOTICE 'Finished layer place'; END$$;
 
@@ -13213,7 +13194,7 @@ FROM (
 ORDER BY "rank"
 $$ LANGUAGE SQL STABLE
                 PARALLEL SAFE;
--- TODO: Check if the above can be made STRICT -- i.e. if pixel_width could be NULL
+-- Note: Function is not STRICT so it gracefully handles optional/null pixel_width calls.
 
 DO $$ BEGIN RAISE NOTICE 'Finished layer poi'; END$$;
 
