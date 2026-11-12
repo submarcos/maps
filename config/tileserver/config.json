@@ -25,15 +25,15 @@
   "styles": {
     "bright": {
       "style": "osm-bright/style.json",
-      "serve_rendered": true
+      "serve_rendered": false
     },
     "liberty": {
       "style": "osm-liberty/style.json",
-      "serve_rendered": true
+      "serve_rendered": false
     },
     "basic": {
       "style": "basic/style.json",
-      "serve_rendered": true
+      "serve_rendered": false
     }
   },
   "data": {
