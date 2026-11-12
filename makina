@@ -45,6 +45,7 @@ function usage() {
     echo -e "  ${C_GREEN}init${C_RESET}                 Initialiser l'environnement et vérifier les dépendances"
     echo -e "  ${C_GREEN}download [zone|url]${C_RESET}  Télécharger un extrait OSM (ex: monaco, andorra, france...)"
     echo -e "  ${C_GREEN}import [fichier.pbf]${C_RESET} Importer les données OSM dans PostGIS et générer le schéma"
+    echo -e "  ${C_GREEN}import-sql${C_RESET}           Créer/recharger les vues spatiales et fonctions MVT (sans réimporter OSM)"
     echo -e "  ${C_GREEN}start | up${C_RESET}           Démarrer la stack complète (Postgres, Postserve, TileServer, Nginx)"
     echo -e "  ${C_GREEN}stop | down${C_RESET}          Arrêter les conteneurs"
     echo -e "  ${C_GREEN}restart${C_RESET}              Redémarrer tous les services"
@@ -140,11 +141,20 @@ function run_test() {
 
     # 5. Téléchargement Tuile Vectorielle PBF
     echo -n "  - Test Tuile PBF (${BASE_URL}/tiles/5/16/11.pbf) : "
-    if curl -s -f "${BASE_URL}/tiles/5/16/11.pbf" >/dev/null 2>&1; then
-        echo -e "${C_GREEN}OK${C_RESET}"
+    local tile_code
+    tile_code=$(curl -s -o /dev/null -w "%{http_code}" "${BASE_URL}/tiles/5/16/11.pbf" 2>/dev/null || echo "000")
+    if [[ "$tile_code" == "200" || "$tile_code" == "204" ]]; then
+        echo -e "${C_GREEN}OK (HTTP ${tile_code})${C_RESET}"
     else
-        echo -e "${C_RED}ÉCHEC${C_RESET}"
+        echo -e "${C_RED}ÉCHEC (HTTP ${tile_code})${C_RESET}"
         failed=1
+        # Diagnostic immédiat de la base
+        local has_water
+        has_water=$(docker compose exec -T postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -tAc "SELECT 1 FROM pg_views WHERE viewname='water_z0';" 2>/dev/null || true)
+        if [[ "$has_water" != "1" ]]; then
+            echo -e "${C_YELLOW}    ↳ Diagnostic : La vue SQL 'water_z0' n'existe pas dans la base.${C_RESET}"
+            echo -e "${C_YELLOW}    ↳ Solution : Exécutez './makina import-sql' ou rejouez './makina import <fichier.pbf>'.${C_RESET}"
+        fi
     fi
 
     if [[ $failed -eq 0 ]]; then
@@ -166,6 +176,24 @@ case "${COMMAND}" in
         ;;
     import)
         ./scripts/02_import.sh "${@}"
+        ;;
+    import-sql)
+        echo -e "${C_BLUE}[*] Import et compilation des vues et fonctions SQL OpenMapTiles...${C_RESET}"
+        # 1. Vérifier Natural Earth
+        HAS_NE=$(docker compose exec -T postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -tAc "SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'ne_10m_lakes';" 2>/dev/null || true)
+        if [[ "$HAS_NE" != "1" ]]; then
+            echo -e "${C_BLUE}[*] Initialisation des tables Natural Earth mondiales...${C_RESET}"
+            docker compose run --rm import-data ./import_data.sh natural-earth
+            docker compose run --rm import-data ./import_data.sh lake-centerline
+        fi
+        docker compose exec -T postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "\
+            CREATE TABLE IF NOT EXISTS osm_ocean_polygon (id serial primary key, geometry geometry(Polygon, 3857));" >/dev/null 2>&1 || true
+        # 2. Exécuter import-sql
+        docker compose run --rm \
+            -e SQL_TOOLS_DIR=/usr/src/app/sql \
+            -e SQL_DIR=/tileset/build \
+            postserve import-sql
+        echo -e "${C_GREEN}✔ Vues spatiales et fonctions SQL initialisées avec succès !${C_RESET}"
         ;;
     start|up)
         banner
