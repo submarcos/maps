@@ -221,7 +221,7 @@ case "${COMMAND}" in
         docker compose logs -f "${@}"
         ;;
     update)
-        ./scripts/03_update.sh
+        ./scripts/03_update.sh "${@}"
         ;;
     purge-cache)
         ./scripts/04_purge_cache.sh "${@}"
