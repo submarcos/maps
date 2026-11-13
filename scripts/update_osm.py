@@ -9,6 +9,7 @@ import sys
 import glob
 import json
 import shutil
+import argparse
 import urllib.request
 import urllib.error
 import subprocess
@@ -129,6 +130,11 @@ def clean_leveldb_locks(cache_dir: Path):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Makina Maps OSM Differential Updater")
+    parser.add_argument("--since", help="Forcer la recherche de diffs depuis une date (ex: 2026-11-10 ou 2026-11-10T21:21:39Z)")
+    parser.add_argument("--force", action="store_true", help="Forcer l'import imposm diff même si déjà importé")
+    args = parser.parse_args()
+
     area = os.environ.get("AREA", "monaco").strip()
     custom_repl_url = os.environ.get("REPLICATION_URL", "").strip() or None
     diff_dir = Path(os.environ.get("IMPOSM_DIFF_DIR", "/import/expire_tiles"))
@@ -145,6 +151,15 @@ def main():
     last_state_file = diff_dir / "last.state.txt"
     staging_diffs_dir = Path("/import/diffs")
 
+    pbf_file = Path("/import/data.osm.pbf")
+    if area == "monaco" and pbf_file.exists():
+        size_mb = pbf_file.stat().st_size / (1024 * 1024)
+        if size_mb > 50:
+            log_warn(
+                f"AREA=monaco est configuré, mais /import/data.osm.pbf fait {size_mb:.0f} Mo. "
+                "Si votre zone est autre (ex: france), lancez './makina update france' ou configurez AREA=france dans .env."
+            )
+
     try:
         repl_url = get_replication_url(area, custom_repl_url)
     except ValueError as e:
@@ -157,10 +172,15 @@ def main():
     # 1. Vérification de l'état local
     local_seq = None
     local_ts = None
-    if last_state_file.exists():
+    local_repl_url = None
+    if args.since:
+        local_ts = args.since if "T" in args.since else f"{args.since}T00:00:00Z"
+        log(f"Date de départ forcée (--since) : {local_ts}")
+    elif last_state_file.exists():
         local_state = parse_state(last_state_file.read_text(encoding="utf-8"))
         local_seq = local_state["sequence"]
         local_ts = local_state["timestamp"]
+        local_repl_url = (local_state["replication_url"] or "").rstrip("/") + "/" if local_state["replication_url"] else None
         log(f"État local : séquence={local_seq}, timestamp={local_ts}")
     else:
         log_warn("Aucun fichier last.state.txt trouvé dans data/expire_tiles/")
@@ -184,13 +204,13 @@ def main():
     # 3. Détermination de la plage de diffs à appliquer
     start_seq = None
 
-    # Si local_seq est déjà dans l'ordre de grandeur du serveur de diffs (ex: Geofabrik daily ~ 4000-6000)
-    # et n'est pas un numéro minutely de la planète (> 1 000 000)
-    if local_seq and (remote_seq - 1000) <= local_seq <= remote_seq:
+    # On ne réutilise directement local_seq que si le replicationUrl correspond au même serveur
+    same_source = (local_repl_url == repl_url)
+    if not args.since and same_source and local_seq and (remote_seq - 1000) <= local_seq <= remote_seq:
         start_seq = local_seq + 1
     elif local_ts:
-        # Trouver la séquence correspondant au timestamp du PBF initial
-        log("Recherche de la séquence correspondant au timestamp initial...")
+        # Trouver la séquence correspondant au timestamp du PBF initial ou --since
+        log("Recherche de la séquence correspondant au timestamp...")
         curr = remote_seq
         while curr >= max(1, remote_seq - 30):
             p = seq_to_path(curr)
@@ -267,6 +287,8 @@ def main():
         "-expiretiles-dir", str(diff_dir),
         "-config", config_file,
     ]
+    if args.force or args.since or not same_source:
+        diff_args.append("-force")
     diff_args.extend([str(p) for p in downloaded_diffs])
 
     try:

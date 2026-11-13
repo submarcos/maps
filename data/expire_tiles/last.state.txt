@@ -1,3 +1,0 @@
-timestamp=2026-11-12T21\:23\:05Z
-sequenceNumber=4966
-replicationUrl=https://download.geofabrik.de/europe/monaco-updates/

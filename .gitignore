@@ -1,7 +1,7 @@
 /.env
 .idea
 /data/*.osm.pbf
+/data/.area
 /data/diffs/
 /data/expire_tiles/*
-!/data/expire_tiles/last.state.txt
 /data/[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]/

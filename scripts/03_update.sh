@@ -14,6 +14,16 @@ if [[ -f .env ]]; then
     source .env
 fi
 
+# Détermination de la zone : 1) argument CLI, 2) .env si != monaco, 3) data/.area, 4) défaut monaco
+TARGET_AREA="${AREA:-monaco}"
+if [[ $# -gt 0 && "${1}" != -* ]]; then
+    TARGET_AREA="${1}"
+    shift
+elif [[ "${TARGET_AREA}" == "monaco" && -f data/.area ]]; then
+    TARGET_AREA="$(cat data/.area)"
+fi
+AREA="${TARGET_AREA}"
+
 echo -e "\033[1;34m====================================================\033[0m"
 echo -e "\033[1;34m     Makina Maps - Mise à jour incrémentale (diffs) \033[0m"
 echo -e "\033[1;34m====================================================\033[0m"

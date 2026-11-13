@@ -57,5 +57,6 @@ else
     fi
 fi
 
+echo "${AREA}" > "${DATA_DIR}/.area"
 SIZE=$(du -h "${TARGET_FILE}" | cut -f1)
 echo -e "\033[1;32m✔ Téléchargement terminé avec succès !\033[0m Fichier sauvegardé : ${TARGET_FILE} (${SIZE})"
