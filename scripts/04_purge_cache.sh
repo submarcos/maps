@@ -15,7 +15,7 @@ echo -e "\033[1;34m[*] Purge du cache Nginx (mode: ${PATTERN})...\033[0m"
 
 if docker compose ps -q nginx >/dev/null 2>&1 && [ -n "$(docker compose ps -q nginx)" ]; then
     if [[ "${PATTERN}" == "all" ]]; then
-        docker compose exec -T nginx rm -rf /cache/* || true
+        docker compose exec -T nginx find /cache -mindepth 1 -delete || true
     else
         docker compose exec -T nginx find /cache -type f -name "*${PATTERN}*" -delete || true
     fi
