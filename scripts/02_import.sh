@@ -58,9 +58,14 @@ if [[ "${HAS_NATURAL_EARTH}" != "1" ]]; then
     docker compose run --rm import-data ./import_data.sh lake-centerline
 fi
 
-# Création de la table océan si absente
-docker compose exec -T postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "\
-    CREATE TABLE IF NOT EXISTS osm_ocean_polygon (id serial primary key, geometry geometry(Polygon, 3857));" >/dev/null 2>&1 || true
+# Import des polygones océaniques mondiaux (osm_ocean_polygon) si absents ou vides
+OCEAN_UNION_COUNT=$(docker compose exec -T postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -tAc "SELECT count(*) FROM osm_ocean_polygon_union;" 2>/dev/null || echo "0")
+OCEAN_COUNT=$(docker compose exec -T postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -tAc "SELECT count(*) FROM osm_ocean_polygon;" 2>/dev/null || echo "0")
+if [[ "${OCEAN_UNION_COUNT:-0}" -eq 0 && "${OCEAN_COUNT:-0}" -eq 0 ]]; then
+    echo -e "\033[1;34m[*] Import des polygones océaniques mondiaux (water-polygons)...\033[0m"
+    docker compose run --rm import-data ./import_data.sh water-polygons
+    docker compose exec -T postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "DROP TABLE IF EXISTS osm_ocean_polygon_union CASCADE;" >/dev/null 2>&1 || true
+fi
 
 # 5. Import des données OSM via Imposm3
 echo -e "\033[1;34m[*] Import des données OSM dans PostGIS avec Imposm3...\033[0m"
