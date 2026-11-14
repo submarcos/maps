@@ -53,7 +53,7 @@ services:
   tileserver-gl:
     image: maptiler/tileserver-gl:latest
     restart: unless-stopped
-    command: --config /data/config/tileserver/config.json --port 8080 --bind 0.0.0.0 --ignore-missing-files --verbose
+    entrypoint: ["sh", "-c", "node /data/config/tileserver/prepare.js && exec /usr/src/app/docker-entrypoint.sh --config /tmp/config.json --port 8080 --bind 0.0.0.0 --ignore-missing-files --verbose"]
     volumes:
       - .:/data
     expose:
