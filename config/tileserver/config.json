@@ -34,6 +34,26 @@
     "basic": {
       "style": "basic/style.json",
       "serve_rendered": true
+    },
+    "positron": {
+      "style": "positron/style.json",
+      "serve_rendered": true
+    },
+    "dark-matter": {
+      "style": "dark-matter/style.json",
+      "serve_rendered": true
+    },
+    "fiord-color": {
+      "style": "fiord-color/style.json",
+      "serve_rendered": true
+    },
+    "toner": {
+      "style": "toner/style.json",
+      "serve_rendered": true
+    },
+    "maptiler-3d": {
+      "style": "maptiler-3d/style.json",
+      "serve_rendered": true
     }
   },
   "data": {

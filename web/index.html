@@ -302,6 +302,41 @@
                         </div>
                     </label>
                     <label class="radio-card">
+                        <input type="radio" name="map-style" value="positron">
+                        <div>
+                            <strong>Positron (Local)</strong>
+                            <div style="font-size:0.72rem; color:#718096;">Thème clair épuré (Carto)</div>
+                        </div>
+                    </label>
+                    <label class="radio-card">
+                        <input type="radio" name="map-style" value="dark-matter">
+                        <div>
+                            <strong>Dark Matter (Local)</strong>
+                            <div style="font-size:0.72rem; color:#718096;">Thème sombre minimaliste</div>
+                        </div>
+                    </label>
+                    <label class="radio-card">
+                        <input type="radio" name="map-style" value="fiord-color">
+                        <div>
+                            <strong>Fiord Color (Local)</strong>
+                            <div style="font-size:0.72rem; color:#718096;">Palette bleu-ardoise moderne</div>
+                        </div>
+                    </label>
+                    <label class="radio-card">
+                        <input type="radio" name="map-style" value="toner">
+                        <div>
+                            <strong>Toner (Local)</strong>
+                            <div style="font-size:0.72rem; color:#718096;">Noir & blanc haut contraste</div>
+                        </div>
+                    </label>
+                    <label class="radio-card">
+                        <input type="radio" name="map-style" value="maptiler-3d">
+                        <div>
+                            <strong>MapTiler 3D (Local)</strong>
+                            <div style="font-size:0.72rem; color:#718096;">Bâtiments 3D en extrusion</div>
+                        </div>
+                    </label>
+                    <label class="radio-card">
                         <input type="radio" name="map-style" value="osm-standard">
                         <div>
                             <strong>OSM Standard Raster Pur</strong>
@@ -378,6 +413,11 @@
             bright: `${host}/styles/bright/style.json`,
             liberty: `${host}/styles/liberty/style.json`,
             basic: `${host}/styles/basic/style.json`,
+            positron: `${host}/styles/positron/style.json`,
+            'dark-matter': `${host}/styles/dark-matter/style.json`,
+            'fiord-color': `${host}/styles/fiord-color/style.json`,
+            toner: `${host}/styles/toner/style.json`,
+            'maptiler-3d': `${host}/styles/maptiler-3d/style.json`,
             'osm-standard': {
                 version: 8,
                 name: 'OpenStreetMap Standard',
