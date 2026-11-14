@@ -261,8 +261,7 @@
         "symbol-spacing": 500,
         "text-field": "{name:latin}\n{name:nonlatin}",
         "text-font": [
-          "Metropolis Medium Italic",
-          "Noto Sans Italic"
+          "Metropolis Medium Italic"
         ],
         "text-rotation-alignment": "map",
         "text-size": 12
@@ -1271,8 +1270,7 @@
         "symbol-spacing": 350,
         "text-field": "{name:latin} {name:nonlatin}",
         "text-font": [
-          "Metropolis Regular",
-          "Noto Sans Regular"
+          "Metropolis Regular"
         ],
         "text-max-angle": 30,
         "text-pitch-alignment": "viewport",
@@ -1318,8 +1316,7 @@
         "symbol-spacing": 350,
         "text-field": "{ref}",
         "text-font": [
-          "Metropolis Light",
-          "Noto Sans Regular"
+          "Metropolis Light"
         ],
         "text-pitch-alignment": "viewport",
         "text-rotation-alignment": "viewport",
@@ -1508,8 +1505,7 @@
         "text-anchor": "center",
         "text-field": "{name:latin}\n{name:nonlatin}",
         "text-font": [
-          "Metropolis Regular",
-          "Noto Sans Regular"
+          "Metropolis Regular"
         ],
         "text-justify": "center",
         "text-offset": [
@@ -1553,8 +1549,7 @@
         "text-anchor": "center",
         "text-field": "{name:latin}\n{name:nonlatin}",
         "text-font": [
-          "Metropolis Regular",
-          "Noto Sans Regular"
+          "Metropolis Regular"
         ],
         "text-justify": "center",
         "text-offset": [
@@ -1599,8 +1594,7 @@
         "text-anchor": "left",
         "text-field": "{name:latin}\n{name:nonlatin}",
         "text-font": [
-          "Metropolis Regular",
-          "Noto Sans Regular"
+          "Metropolis Regular"
         ],
         "text-justify": "left",
         "text-offset": [
@@ -1671,8 +1665,7 @@
         },
         "text-field": "{name:latin}\n{name:nonlatin}",
         "text-font": [
-          "Metropolis Regular",
-          "Noto Sans Regular"
+          "Metropolis Regular"
         ],
         "text-justify": "left",
         "text-offset": [
@@ -1748,8 +1741,7 @@
         },
         "text-field": "{name:latin}\n{name:nonlatin}",
         "text-font": [
-          "Metropolis Regular",
-          "Noto Sans Regular"
+          "Metropolis Regular"
         ],
         "text-justify": "left",
         "text-offset": [
@@ -1825,8 +1817,7 @@
         },
         "text-field": "{name:latin}\n{name:nonlatin}",
         "text-font": [
-          "Metropolis Regular",
-          "Noto Sans Regular"
+          "Metropolis Regular"
         ],
         "text-justify": "left",
         "text-offset": [
@@ -1870,8 +1861,7 @@
       "layout": {
         "text-field": "{name:latin}\n{name:nonlatin}",
         "text-font": [
-          "Metropolis Regular",
-          "Noto Sans Regular"
+          "Metropolis Regular"
         ],
         "text-size": 10,
         "text-transform": "uppercase",
@@ -1913,8 +1903,7 @@
       "layout": {
         "text-field": "{name:latin}",
         "text-font": [
-          "Metropolis Light Italic",
-          "Noto Sans Italic"
+          "Metropolis Light Italic"
         ],
         "text-size": {
           "base": 1,
@@ -1972,8 +1961,7 @@
       "layout": {
         "text-field": "{name:latin}",
         "text-font": [
-          "Metropolis Regular",
-          "Noto Sans Regular"
+          "Metropolis Regular"
         ],
         "text-size": {
           "base": 1,
@@ -2032,8 +2020,7 @@
         "text-anchor": "center",
         "text-field": "{name:latin}",
         "text-font": [
-          "Metropolis Regular",
-          "Noto Sans Regular"
+          "Metropolis Regular"
         ],
         "text-size": {
           "base": 1.4,
