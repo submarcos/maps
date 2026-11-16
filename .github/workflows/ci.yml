@@ -86,8 +86,9 @@ jobs:
           for i in $(seq 1 30); do
             if curl -sf http://localhost:8080/health >/dev/null && \
                curl -sf http://localhost:8080/data/v3.json >/dev/null && \
+               curl -sf http://localhost:8080/tiles/13/4264/2988.pbf >/dev/null && \
                curl -sf http://localhost:8080/styles/bright/13/4264/2988.png >/dev/null; then
-              echo "Stack ready after ${i}s"
+              echo "Stack ready at attempt ${i}"
               exit 0
             fi
             sleep 2
@@ -131,12 +132,20 @@ jobs:
         run: |
           for style in bright liberty basic positron dark-matter fiord-color toner maptiler-3d; do
             code=$(curl -s -o "/tmp/${style}.png" -w "%{http_code}" "http://localhost:8080/styles/${style}/13/4264/2988.png")
-            [ "$code" = "200" ]
+            echo "${style} -> HTTP ${code}"
+            if [ "$code" != "200" ]; then
+              cat "/tmp/${style}.png" || true
+              exit 1
+            fi
             file "/tmp/${style}.png" | grep -q "PNG image data"
           done
 
           code2x=$(curl -s -o /tmp/bright2x.png -w "%{http_code}" "http://localhost:8080/styles/bright/13/4264/2988@2x.png")
-          [ "$code2x" = "200" ]
+          echo "bright@2x -> HTTP ${code2x}"
+          if [ "$code2x" != "200" ]; then
+            cat /tmp/bright2x.png || true
+            exit 1
+          fi
           file /tmp/bright2x.png | grep -q "PNG image data"
 
       - name: Verify incremental OSM update & cache purge (./makina update monaco & ./makina purge-cache)
