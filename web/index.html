@@ -356,6 +356,13 @@
                         </div>
                     </label>
                     <label class="radio-card">
+                        <input type="radio" name="map-style" value="plan-ign-classique">
+                        <div>
+                            <strong>Plan IGN Classique (Local)</strong>
+                            <div style="font-size:0.72rem; color:#718096;">Inspiré du Plan IGN classique / Scan25 (OSM)</div>
+                        </div>
+                    </label>
+                    <label class="radio-card">
                         <input type="radio" name="map-style" value="osm-standard">
                         <div>
                             <strong>OSM Standard Raster Pur</strong>
@@ -438,6 +445,7 @@
             toner: `${host}/styles/toner/style.json`,
             'maptiler-3d': `${host}/styles/maptiler-3d/style.json`,
             'plan-ign': `${host}/styles/plan-ign/style.json`,
+            'plan-ign-classique': `${host}/styles/plan-ign-classique/style.json`,
             'osm-standard': {
                 version: 8,
                 name: 'OpenStreetMap Standard',

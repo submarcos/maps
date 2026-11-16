@@ -105,7 +105,7 @@ jobs:
         run: |
           html=$(curl -sf http://localhost:8080/)
           echo "$html" | grep -q "Makina Maps"
-          for style in bright liberty basic positron dark-matter fiord-color toner maptiler-3d plan-ign; do
+          for style in bright liberty basic positron dark-matter fiord-color toner maptiler-3d plan-ign plan-ign-classique; do
             echo "$html" | grep -q "value=\"${style}\""
             curl -sf "http://localhost:8080/styles/${style}/style.json" | python3 -m json.tool >/dev/null
           done
@@ -130,7 +130,7 @@ jobs:
 
       - name: Verify raster tiles (PNG & @2x) for all styles
         run: |
-          for style in bright liberty basic positron dark-matter fiord-color toner maptiler-3d plan-ign; do
+          for style in bright liberty basic positron dark-matter fiord-color toner maptiler-3d plan-ign plan-ign-classique; do
             code=$(curl -s -o "/tmp/${style}.png" -w "%{http_code}" "http://localhost:8080/styles/${style}/13/4264/2988.png")
             echo "${style} -> HTTP ${code}"
             if [ "$code" != "200" ]; then

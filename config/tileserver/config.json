@@ -58,6 +58,10 @@
     "plan-ign": {
       "style": "plan-ign/style.json",
       "serve_rendered": true
+    },
+    "plan-ign-classique": {
+      "style": "plan-ign-classique/style.json",
+      "serve_rendered": true
     }
   },
   "data": {
