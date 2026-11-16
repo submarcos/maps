@@ -106,7 +106,7 @@ function run_test() {
 
     # 1. Healthcheck
     echo -n "  - Test endpoint santé (${BASE_URL}/health) : "
-    if curl -s -f "${BASE_URL}/health" | grep -q "ok"; then
+    if curl -s -f "${BASE_URL}/health" | grep "ok" >/dev/null; then
         echo -e "${C_GREEN}OK${C_RESET}"
     else
         echo -e "${C_RED}ÉCHEC (La stack est-elle démarrée avec './makina start' ?)${C_RESET}"
@@ -115,7 +115,7 @@ function run_test() {
 
     # 2. Visualiseur Web
     echo -n "  - Test visualiseur Web (${BASE_URL}/) : "
-    if curl -s -f "${BASE_URL}/" | grep -q "Makina Maps"; then
+    if curl -s -f "${BASE_URL}/" | grep "Makina Maps" >/dev/null; then
         echo -e "${C_GREEN}OK${C_RESET}"
     else
         echo -e "${C_RED}ÉCHEC${C_RESET}"
