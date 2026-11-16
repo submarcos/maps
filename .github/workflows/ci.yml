@@ -1,0 +1,164 @@
+name: Makina Maps CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  lint-and-validate:
+    name: Lint scripts & validate styles
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate shell & Python syntax
+        run: |
+          bash -n makina scripts/*.sh
+          python3 -m py_compile scripts/*.py
+
+      - name: Validate JSON configs, styles, sprites & fonts
+        run: |
+          python3 - <<'EOF'
+          import json, os, sys
+
+          with open("config/tileserver/config.json", encoding="utf-8") as f:
+              cfg = json.load(f)
+
+          styles = cfg.get("styles", {})
+          if not styles:
+              sys.exit("No styles configured in config/tileserver/config.json")
+
+          for key, entry in styles.items():
+              style_path = os.path.join("styles", entry["style"])
+              if not os.path.isfile(style_path):
+                  sys.exit(f"Missing style file: {style_path}")
+              with open(style_path, encoding="utf-8") as f:
+                  style = json.load(f)
+
+              # Verify sprite files exist if style defines local sprite
+              sprite = style.get("sprite", "")
+              if sprite.startswith("http://localhost:8080/styles/"):
+                  rel = sprite.removeprefix("http://localhost:8080/")
+                  for suffix in [".json", ".png", "@2x.json", "@2x.png"]:
+                      if not os.path.isfile(rel + suffix):
+                          sys.exit(f"Missing sprite file for {key}: {rel}{suffix}")
+
+              # Verify referenced single fonts exist in fonts/
+              for layer in style.get("layers", []):
+                  tf = layer.get("layout", {}).get("text-font")
+                  if isinstance(tf, list):
+                      if len(tf) > 1:
+                          sys.exit(f"{key} layer {layer.get('id')} has multi-font array {tf} (incompatible with static Nginx /fonts/)")
+                      for font_name in tf:
+                          if not os.path.isdir(os.path.join("fonts", font_name)):
+                              sys.exit(f"Missing font directory for {key}: fonts/{font_name}")
+
+          print(f"Validated {len(styles)} styles successfully: {', '.join(styles.keys())}")
+          EOF
+
+  integration-monaco:
+    name: Integration test (Monaco import, update, MVT/raster tiles & web UI)
+    needs: lint-and-validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize project (./makina init)
+        run: ./makina init
+
+      - name: Download Monaco extract (./makina download monaco)
+        run: ./makina download monaco
+
+      - name: Import Monaco & OpenMapTiles SQL (./makina import)
+        run: ./makina import
+
+      - name: Start stack (./makina start)
+        run: ./makina start
+
+      - name: Wait for Nginx, Postserve & TileServer-GL readiness
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/health >/dev/null && \
+               curl -sf http://localhost:8080/data/v3.json >/dev/null && \
+               curl -sf http://localhost:8080/styles/bright/13/4264/2988.png >/dev/null; then
+              echo "Stack ready after ${i}s"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Timeout waiting for stack readiness"
+          exit 1
+
+      - name: Run built-in CLI checks (./makina status & ./makina test)
+        run: |
+          ./makina status
+          ./makina test
+
+      - name: Verify front-end UI (index.html), TileJSON, styles, sprites & fonts
+        run: |
+          html=$(curl -sf http://localhost:8080/)
+          echo "$html" | grep -q "Makina Maps"
+          for style in bright liberty basic positron dark-matter fiord-color toner maptiler-3d; do
+            echo "$html" | grep -q "value=\"${style}\""
+            curl -sf "http://localhost:8080/styles/${style}/style.json" | python3 -m json.tool >/dev/null
+          done
+
+          curl -sf http://localhost:8080/data/v3.json | python3 -m json.tool >/dev/null
+          curl -sf http://localhost:8080/styles/dark-matter/sprite.json >/dev/null
+          curl -sf http://localhost:8080/styles/dark-matter/sprite.png >/dev/null
+          curl -sf "http://localhost:8080/fonts/Noto%20Sans%20Regular/0-255.pbf" >/dev/null
+          curl -sf "http://localhost:8080/fonts/Metropolis%20Light/0-255.pbf" >/dev/null
+
+      - name: Verify vector tiles (MVT/PBF land & ocean)
+        run: |
+          # Monaco land tile
+          code=$(curl -s -o /tmp/land.pbf -w "%{http_code}" http://localhost:8080/tiles/13/4264/2988.pbf)
+          [ "$code" = "200" ]
+          [ -s /tmp/land.pbf ]
+
+          # Mediterranean ocean tile off Monaco (verifies water-polygons)
+          code=$(curl -s -o /tmp/ocean.pbf -w "%{http_code}" http://localhost:8080/tiles/14/8531/5976.pbf)
+          [ "$code" = "200" ]
+          [ -s /tmp/ocean.pbf ]
+
+      - name: Verify raster tiles (PNG & @2x) for all styles
+        run: |
+          for style in bright liberty basic positron dark-matter fiord-color toner maptiler-3d; do
+            code=$(curl -s -o "/tmp/${style}.png" -w "%{http_code}" "http://localhost:8080/styles/${style}/13/4264/2988.png")
+            [ "$code" = "200" ]
+            file "/tmp/${style}.png" | grep -q "PNG image data"
+          done
+
+          code2x=$(curl -s -o /tmp/bright2x.png -w "%{http_code}" "http://localhost:8080/styles/bright/13/4264/2988@2x.png")
+          [ "$code2x" = "200" ]
+          file /tmp/bright2x.png | grep -q "PNG image data"
+
+      - name: Verify incremental OSM update & cache purge (./makina update monaco & ./makina purge-cache)
+        run: |
+          ./makina update monaco < /dev/null
+          ./makina purge-cache
+
+          # Re-verify tiles serve cleanly after update + cache purge
+          code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/tiles/13/4264/2988.pbf)
+          [ "$code" = "200" ]
+          code_png=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/styles/bright/13/4264/2988.png)
+          [ "$code_png" = "200" ]
+
+      - name: Verify ./makina stop
+        run: ./makina stop
+
+      - name: Dump container status and logs on failure
+        if: failure()
+        run: |
+          docker compose ps -a || true
+          docker compose logs --tail=80 || true
+
+      - name: Cleanup Docker stack
+        if: always()
+        run: docker compose down -v --remove-orphans || true
