@@ -54,6 +54,10 @@
     "maptiler-3d": {
       "style": "maptiler-3d/style.json",
       "serve_rendered": true
+    },
+    "plan-ign": {
+      "style": "plan-ign/style.json",
+      "serve_rendered": true
     }
   },
   "data": {
